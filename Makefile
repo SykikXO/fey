@@ -1,33 +1,36 @@
-
 # Compiler and flags
-CC = gcc
-CFLAGS = -Wall -Wextra -pthread -I.
+CXX = g++
+CXXFLAGS = -Wall -Wextra -pthread -I.
 
 # Linker flags
 LDFLAGS = -lwayland-client -lm -lpthread
 
-# Source files
-SRCS = main.c async.c xdg-shell-protocol.c stb_image_impl.c
+# Update source files to exclude async.c, async.h, stb_image_impl.c
+SRCS = main.cpp xdg-shell-protocol.c
 
-# Object files are placed in build directory
+# Object files in build directory
 OBJDIR = build
-OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
+OBJS = $(patsubst %.c,$(OBJDIR)/%.o,$(filter %.c,$(SRCS))) $(patsubst %.cpp,$(OBJDIR)/%.o,$(filter %.cpp,$(SRCS)))
 
-# Target executable name
+# Target executable
 TARGET = execthis
 
-# Default target: build executable
+# Default target to build executable
 all: $(TARGET)
 
-# Link executable from object files
+# Link object files to produce executable
 $(TARGET): $(OBJS)
-	$(CC) $(OBJS) -o $@ $(LDFLAGS)
+	$(CXX) $^ -o $@ $(LDFLAGS)
 
-# Compile .c files to .o files in build directory
+# Compile C++ source files to object files in build directory
+$(OBJDIR)/%.o: %.cpp | $(OBJDIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+# Compile C source files to object files in build directory
 $(OBJDIR)/%.o: %.c | $(OBJDIR)
-	$(CC) $(CFLAGS) -c $< -o $@
+	gcc $(CFLAGS) -c $< -o $@
 
-# Create build directory if it does not exist
+# Create build directory if it doesn't exist
 $(OBJDIR):
 	mkdir -p $(OBJDIR)
 
@@ -36,3 +39,4 @@ clean:
 	rm -rf $(OBJDIR) $(TARGET)
 
 .PHONY: all clean
+
