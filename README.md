@@ -1,17 +1,17 @@
 # fey
 
-`fey` is a high-performance, minimalistic image viewer for Wayland, written in C++. It focuses on speed, smooth animations, and efficiency.
+fey is a minimalistic, high-performance image viewer for Wayland, written in C++. It focuses on speed, smooth animations, and efficiency.
 
-## ✨ Features
+## Features
 
-- **🚀 Performance**: Direct-to-SHM rendering for zero-copy buffer updates.
-- **🌀 Smooth Animations**: Hardware-synchronized rubber-band physics for zoom and pan limits.
-- **🎞️ GIF Support**: Full animated GIF playback with adaptive frame-rate synchronization.
-- **🔋 Energy Efficient**: Adaptive refresh rate and intelligent event throttling to minimize CPU/Power usage.
-- **📸 Metadata**: Pre-cached EXIF photographic metadata display using `exiv2`.
-- **🤏 Gestures**: Native Wayland pinch-to-zoom and pan support.
+- **Performance**: Direct-to-SHM rendering for zero-copy buffer updates.
+- **Smooth Animations**: Hardware-synchronized rubber-band physics for zoom and pan limits.
+- **GIF Support**: Full animated GIF playback with adaptive frame-rate synchronization.
+- **Energy Efficient**: Adaptive refresh rate and intelligent event throttling to minimize CPU/Power usage.
+- **Metadata**: Pre-cached EXIF photographic metadata display using `exiv2`.
+- **Gestures**: Native Wayland pinch-to-zoom and pan support.
 
-## 🛠️ Build & Install
+## Build & Install
 
 ### Dependencies
 - `wayland`
@@ -29,7 +29,7 @@ make
 sudo make install
 ```
 
-## ⌨️ Hotkeys
+## Hotkeys
 
 - `q`: Quit
 - `Left` / `Right`: Previous / Next image
@@ -40,5 +40,5 @@ sudo make install
 - **Mouse Drag**: Pan image
 - **Pinch Gesture**: Zoom/Pan
 
-## 📄 License
+## License
 MIT
