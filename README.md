@@ -2,6 +2,11 @@
 
 fey is a minimalistic, high-performance image viewer for Wayland, written in C++. It focuses on speed, smooth animations, and efficiency.
 
+
+<p align="center">
+  <img src="src/picture.png" alt="Homepage Screenshot" width="80%">
+</p>
+
 ## Features
 
 - **Performance**: Direct-to-SHM rendering for zero-copy buffer updates.
