@@ -55,50 +55,29 @@ void draw_icon(cairo_t *cr, double x, double y, int type) {
 }
 
 void create_buffer(struct app_state *app) {
-  if (app->width <= 0 || app->height <= 0) return;
-
-  int stride = app->width * 4;
+  int stride = cairo_format_stride_for_width(CAIRO_FORMAT_ARGB32, app->width);
   size_t size = stride * app->height;
 
-  // Reuse SHM if possible
-  if (!app->shm_data || app->shm_size != size) {
+  if (app->shm_fd == -1 || app->shm_size != size) {
     if (app->shm_data) munmap(app->shm_data, app->shm_size);
-    if (app->shm_fd >= 0) close(app->shm_fd);
-    if (app->buffer) wl_buffer_destroy(app->buffer);
+    if (app->shm_fd != -1) close(app->shm_fd);
 
     app->shm_fd = create_shm_file(size);
-    if (app->shm_fd < 0) {
-        fprintf(stderr, "Fatal: create_shm_file failed\n");
-        app->running = 0;
-        return;
-    }
-
-    app->shm_data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, app->shm_fd, 0);
-    if (app->shm_data == MAP_FAILED) {
-        fprintf(stderr, "Fatal: mmap failed\n");
-        app->shm_data = nullptr;
-        app->running = 0;
-        return;
-    }
+    if (app->shm_fd == -1) die("create_shm_file failed");
+    app->shm_data = (uint8_t*)mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, app->shm_fd, 0);
     app->shm_size = size;
 
+    if (app->buffer) wl_buffer_destroy(app->buffer);
     struct wl_shm_pool *pool = wl_shm_create_pool(app->shm, app->shm_fd, size);
     app->buffer = wl_shm_pool_create_buffer(pool, 0, app->width, app->height, stride, WL_SHM_FORMAT_ARGB8888);
     wl_shm_pool_destroy(pool);
   }
 
-  if (!app->shm_data) return;
-
-  // Create Cairo surface for the Wayland buffer
-  cairo_surface_t *surface = cairo_image_surface_create_for_data(
-      (unsigned char*)app->shm_data, CAIRO_FORMAT_ARGB32, app->width, app->height, stride);
-  if (cairo_surface_status(surface) != CAIRO_STATUS_SUCCESS) {
-      cairo_surface_destroy(surface);
-      return;
-  }
+  // Draw directly to SHM
+  cairo_surface_t *surface = cairo_image_surface_create_for_data((unsigned char*)app->shm_data, CAIRO_FORMAT_ARGB32, app->width, app->height, stride);
   cairo_t *cr = cairo_create(surface);
 
-  // Clear background
+  // Background
   cairo_set_source_rgb(cr, 0, 0, 0);
   cairo_paint(cr);
 
@@ -137,43 +116,11 @@ void create_buffer(struct app_state *app) {
     cairo_surface_destroy(img_surface);
   }
 
-  // Draw UI Tray
-  int btn_w = 40, btn_h = 40, spacing = 20;
-  int tray_w = 3 * btn_w + 4 * spacing;
-  int tray_h = btn_h + 20;
-  double tray_x = (app->width - tray_w) / 2.0;
-  double tray_y = app->height - tray_h - 20;
-
-  cairo_set_source_rgba(cr, 0.1, 0.1, 0.1, 0.6); // Translucent tray
-  cairo_new_sub_path(cr);
-  cairo_arc(cr, tray_x + 15, tray_y + 15, 15, M_PI, 1.5 * M_PI);
-  cairo_arc(cr, tray_x + tray_w - 15, tray_y + 15, 15, 1.5 * M_PI, 2 * M_PI);
-  cairo_arc(cr, tray_x + tray_w - 15, tray_y + tray_h - 15, 15, 0, 0.5 * M_PI);
-  cairo_arc(cr, tray_x + 15, tray_y + tray_h - 15, 15, 0.5 * M_PI, M_PI);
-  cairo_close_path(cr);
-  cairo_fill(cr);
-
-  // Draw Buttons
-  double start_x = tray_x + spacing;
-  double start_y = tray_y + 10;
-  int icons[3] = {0, 2, 1}; // Left, Info, Right
-  for (int i = 0; i < 3; ++i) {
-    draw_icon(cr, start_x + i * (btn_w + spacing), start_y, icons[i]);
-  }
-
-  // Draw Info Text
+  // Overlay UI
   if (app->show_info) {
-    struct stat st;
-    stat(app->images[app->current_index].c_str(), &st);
-
     std::vector<std::string> lines;
-    lines.push_back("Path: " + app->images[app->current_index]);
-    lines.push_back("Res:  " + std::to_string(app->orig_width) + "x" + std::to_string(app->orig_height));
-    
-    char size_buf[64];
-    snprintf(size_buf, 64, "Size: %.2f MB", (double)st.st_size / (1024*1024));
-    lines.push_back(size_buf);
-    
+    lines.push_back(app->images[app->current_index]);
+    lines.push_back("Res: " + std::to_string(app->orig_width) + "x" + std::to_string(app->orig_height));
     lines.push_back("Zoom: " + std::to_string(app->zoom).substr(0,4) + "x | Index: " + std::to_string(app->current_index + 1) + "/" + std::to_string(app->images.size()));
 
     // Use cached metadata

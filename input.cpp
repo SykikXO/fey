@@ -77,16 +77,15 @@ static void keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t seri
     } else if (key == KEY_I) {
       app->show_info = !app->show_info;
       redraw(app);
+    } else if (key == KEY_EQUAL || key == KEY_KPPLUS) {
+      // Discrete Zoom Step In
+      app->zoom = std::min(app->zoom + 0.1f, 10.0f);
+      redraw(app);
+    } else if (key == KEY_MINUS || key == KEY_KPMINUS) {
+      // Discrete Zoom Step Out
+      app->zoom = std::max(app->zoom - 0.1f, 0.05f);
+      redraw(app);
     }
-  }
-
-  // Toggle continuous zooming state
-  if (key == KEY_EQUAL || key == KEY_KPPLUS) {
-    app->zooming_in = pressed;
-    if (pressed) redraw(app);
-  } else if (key == KEY_MINUS || key == KEY_KPMINUS) {
-    app->zooming_out = pressed;
-    if (pressed) redraw(app);
   }
 }
 
@@ -154,16 +153,29 @@ static void pointer_button(void *data, struct wl_pointer *pointer, uint32_t seri
 static void pointer_motion(void *data, struct wl_pointer *pointer, uint32_t time, wl_fixed_t surface_x, wl_fixed_t surface_y) {
   (void)pointer; (void)time;
   struct app_state *app = static_cast<struct app_state*>(data);
+  double old_y = app->mouse_y;
   app->mouse_x = wl_fixed_to_double(surface_x);
   app->mouse_y = wl_fixed_to_double(surface_y);
+
+  // Throttling: only redraw if panning or if mouse crosses UI tray area
+  int tray_h = 60; // Approximate tray area height at bottom
+  bool redraw_needed = app->is_panning;
+  
+  if (!redraw_needed) {
+      // Check if mouse entered or left the potential tray area
+      bool was_near_bottom = (old_y > app->height - tray_h);
+      bool is_near_bottom = (app->mouse_y > app->height - tray_h);
+      if (was_near_bottom != is_near_bottom) redraw_needed = true;
+  }
 
   if (app->is_panning) {
     app->pan_x += (app->mouse_x - app->last_mouse_x);
     app->pan_y += (app->mouse_y - app->last_mouse_y);
     app->last_mouse_x = app->mouse_x;
     app->last_mouse_y = app->mouse_y;
-    redraw(app);
   }
+
+  if (redraw_needed) redraw(app);
 }
 
 static void pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axis, wl_fixed_t value) {

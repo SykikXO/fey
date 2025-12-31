@@ -89,14 +89,25 @@ static void surface_frame_callback(void *data, struct wl_callback *callback, uin
       ui_animating = true;
   }
 
+  // Continuous Zoom Physics
+  float zoom_speed = 1.03f;
+  if (app->zooming_in) {
+      app->zoom = std::min(app->zoom * zoom_speed, 15.0f);
+      ui_animating = true;
+  }
+  if (app->zooming_out) {
+      app->zoom = std::max(app->zoom / zoom_speed, 0.05f);
+      ui_animating = true;
+  }
+
   // Redraw if needed
-  if (app->redraw_pending || app->zooming_in || app->zooming_out || ui_animating) {
+  if (app->redraw_pending || ui_animating) {
     create_buffer(app);
     wl_surface_attach(app->surface, app->buffer, 0, 0);
     wl_surface_damage(app->surface, 0, 0, app->width, app->height);
 
-    // Only request next frame callback if UI interaction/physics is taking place
-    if (app->zooming_in || app->zooming_out || ui_animating) {
+    // Always request next frame callback if UI interaction/physics/zooming is taking place
+    if (ui_animating || app->zooming_in || app->zooming_out) {
       app->frame_callback = wl_surface_frame(app->surface);
       wl_callback_add_listener(app->frame_callback, &frame_listener, app);
     }
@@ -163,23 +174,13 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    // 2. Continuous Zooming State
-    if (app.zooming_in) {
-      app.zoom = std::min(app.zoom * 1.03f, 15.0f);
-      app.redraw_pending = true;
-    }
-    if (app.zooming_out) {
-      app.zoom = std::max(app.zoom * 0.97f, 0.05f);
-      app.redraw_pending = true;
-    }
-
-    // 3. Trigger Redraw if Ready
+    // 2. Trigger Redraw if Ready (Only if no frame callback is pending)
     if (app.redraw_pending && !app.frame_callback && app.configured) {
         create_buffer(&app);
         if (app.buffer) {
             wl_surface_attach(app.surface, app.buffer, 0, 0);
             wl_surface_damage(app.surface, 0, 0, app.width, app.height);
-            // Request frame callback if we are in high-fidelity interaction
+            // If animation starts, frame callback will be set up in callback or here
             if (app.zooming_in || app.zooming_out || std::abs(app.zoom - app.target_zoom) > 0.001f ||
                 std::abs(app.pan_x - app.target_pan_x) > 0.1f || std::abs(app.pan_y - app.target_pan_y) > 0.1f) {
                 app.frame_callback = wl_surface_frame(app.surface);
