@@ -109,7 +109,17 @@ void create_buffer(struct app_state *app) {
     cairo_translate(cr, offset_x, offset_y);
     cairo_scale(cr, scale_x, scale_y);
     cairo_set_source_surface(cr, img_surface, 0, 0);
-    cairo_pattern_set_filter(cairo_get_source(cr), CAIRO_FILTER_BILINEAR);
+
+    // Adaptive filtering: use FAST during active interaction, BILINEAR when idle
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - app->last_interaction_time).count();
+    
+    if (elapsed_ms < 100 || app->zooming_in || app->zooming_out) {
+        cairo_pattern_set_filter(cairo_get_source(cr), CAIRO_FILTER_FAST);
+    } else {
+        cairo_pattern_set_filter(cairo_get_source(cr), CAIRO_FILTER_BILINEAR);
+    }
+    
     cairo_paint(cr);
     cairo_restore(cr);
     

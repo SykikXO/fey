@@ -128,6 +128,7 @@ int main(int argc, char *argv[]) {
   app.target_pan_x = app.target_pan_y = 0;
   app.shm_fd = -1;
   app.configured = false;
+  app.last_interaction_time = std::chrono::steady_clock::now();
 
   scan_directory(&app, argv[1]);
   if (app.images.empty()) die("No images found");
@@ -199,7 +200,7 @@ int main(int argc, char *argv[]) {
 
     // 5. Dynamic Poll Timeout
     struct pollfd pfd = { display_fd, POLLIN, 0 };
-    int timeout = -1; // Wait forever unless we have an animation
+    int timeout = -1; // Wait forever unless we have an animation or pending redraw
     
     // Check if we need a timeout for the next GIF frame
     if (it_cache != app.cache.end() && it_cache->second.frames.size() > 1) {
@@ -210,11 +211,16 @@ int main(int argc, char *argv[]) {
         timeout = std::max(0, (int)(delay - (int)elapsed));
     }
 
-    // If something is pending or we are doing intensive work, don't sleep
-    if (app.redraw_pending || app.zooming_in || app.zooming_out || app.frame_callback) {
+    // REDRAW READY: If a redraw is pending and NO frame callback is active,
+    // we should process it immediately (0 timeout).
+    if (app.redraw_pending && !app.frame_callback) {
         timeout = 0;
     }
 
+    // IF CONTINUOUSLY ZOOMING: Ensure we keep checking the time to trigger the next frame
+    // via the redraw_pending logic in the next loop iteration. 
+    // Usually, this will be handled by the frame_callback presentation.
+    
     if (poll(&pfd, 1, timeout) > 0) {
       wl_display_read_events(app.display);
     } else {

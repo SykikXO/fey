@@ -76,6 +76,8 @@ struct app_state {
   float target_pan_x, target_pan_y;
   bool is_panning;
   double last_mouse_x, last_mouse_y;
+
+  std::chrono::steady_clock::time_point last_interaction_time;
 };
 
 void die(const char *msg);

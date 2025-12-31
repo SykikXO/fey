@@ -14,6 +14,7 @@ static void pinch_begin(void *data, struct zwp_pointer_gesture_pinch_v1 *pinch, 
 
 static void redraw(struct app_state *app) {
   app->redraw_pending = true;
+  app->last_interaction_time = std::chrono::steady_clock::now();
 }
 
 static void pinch_update(void *data, struct zwp_pointer_gesture_pinch_v1 *pinch, uint32_t time, wl_fixed_t dx, wl_fixed_t dy, wl_fixed_t scale, wl_fixed_t rotation) {
