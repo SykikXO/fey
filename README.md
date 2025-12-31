@@ -18,10 +18,8 @@ fey is a minimalistic, high-performance image viewer for Wayland, written in C++
 
 ## Install From AUR 
 
-- paru
-- `paru -S fey`
-- yay
-- `yay -S fey`
+- paru -> `paru -S fey`
+- yay -->  `yay -S fey`
 
 ## Build & Install
 
