@@ -1,0 +1,5 @@
+build/
+fey
+*.o
+*.a
+*.so
