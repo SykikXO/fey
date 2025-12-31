@@ -83,8 +83,10 @@ static void keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t seri
   // Toggle continuous zooming state
   if (key == KEY_EQUAL || key == KEY_KPPLUS) {
     app->zooming_in = pressed;
+    if (pressed) redraw(app);
   } else if (key == KEY_MINUS || key == KEY_KPMINUS) {
     app->zooming_out = pressed;
+    if (pressed) redraw(app);
   }
 }
 

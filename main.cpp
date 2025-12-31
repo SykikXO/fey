@@ -51,7 +51,6 @@ static void surface_frame_callback(void *data, struct wl_callback *callback, uin
   app->frame_callback = nullptr;
 
   // Rubber-band animation physics
-  bool animating = false;
   float lerp_factor = 0.15f;
   
   // 1. Zoom limits (0.05x to 10.0x)
@@ -76,17 +75,18 @@ static void surface_frame_callback(void *data, struct wl_callback *callback, uin
   else app->target_pan_y = std::clamp(app->pan_y, -limit_y, limit_y);
 
   // 3. Apply Rebound Animation
+  bool ui_animating = false;
   if (std::abs(app->zoom - app->target_zoom) > 0.001f) {
       app->zoom += (app->target_zoom - app->zoom) * lerp_factor;
-      animating = true;
+      ui_animating = true;
   }
   if (std::abs(app->pan_x - app->target_pan_x) > 0.1f) {
       app->pan_x += (app->target_pan_x - app->pan_x) * lerp_factor;
-      animating = true;
+      ui_animating = true;
   }
   if (std::abs(app->pan_y - app->target_pan_y) > 0.1f) {
       app->pan_y += (app->target_pan_y - app->pan_y) * lerp_factor;
-      animating = true;
+      ui_animating = true;
   }
 
   // GIF Animation Step
@@ -95,26 +95,29 @@ static void surface_frame_callback(void *data, struct wl_callback *callback, uin
       auto now = std::chrono::steady_clock::now();
       auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - app->last_frame_time).count();
       int delay = it_cache->second.delays[app->current_frame_index % it_cache->second.frames.size()];
-      if (delay <= 0) delay = 100; // Default fallback for GIFs with 0 delay
+      if (delay <= 0) delay = 100;
 
       if (elapsed >= delay) {
           app->current_frame_index = (app->current_frame_index + 1) % it_cache->second.frames.size();
           app->last_frame_time = now;
           app->redraw_pending = true;
       }
-      animating = true; // Keep callback loop alive for next frame
+      // Note: We don't set ui_animating here. GIF redraws will be triggered via poll() timeout.
   }
 
-  // Trigger next frame if animating or state changes
-  if (app->redraw_pending || app->zooming_in || app->zooming_out || animating) {
+  // Redraw if needed
+  if (app->redraw_pending || app->zooming_in || app->zooming_out || ui_animating) {
     create_buffer(app);
     wl_surface_attach(app->surface, app->buffer, 0, 0);
     wl_surface_damage(app->surface, 0, 0, app->width, app->height);
 
-    app->frame_callback = wl_surface_frame(app->surface);
-    wl_callback_add_listener(app->frame_callback, &frame_listener, app);
-    wl_surface_commit(app->surface);
+    // Only request next frame callback if UI interaction/physics is taking place
+    if (app->zooming_in || app->zooming_out || ui_animating) {
+      app->frame_callback = wl_surface_frame(app->surface);
+      wl_callback_add_listener(app->frame_callback, &frame_listener, app);
+    }
     
+    wl_surface_commit(app->surface);
     app->redraw_pending = false;
   }
 }
@@ -173,12 +176,17 @@ int main(int argc, char *argv[]) {
 
     // Trigger redraw if ready
     if (app.redraw_pending && !app.frame_callback && app.configured) {
+        // This handles cases like idle GIF playback or immediate user input
         create_buffer(&app);
         if (app.buffer) {
             wl_surface_attach(app.surface, app.buffer, 0, 0);
             wl_surface_damage(app.surface, 0, 0, app.width, app.height);
-            app.frame_callback = wl_surface_frame(app.surface);
-            wl_callback_add_listener(app.frame_callback, &frame_listener, &app);
+            // If it's a UI animation start, we'll kick off the frame_callback loop here
+            if (app.zooming_in || app.zooming_out || std::abs(app.zoom - app.target_zoom) > 0.001f ||
+                std::abs(app.pan_x - app.target_pan_x) > 0.1f || std::abs(app.pan_y - app.target_pan_y) > 0.1f) {
+                app.frame_callback = wl_surface_frame(app.surface);
+                wl_callback_add_listener(app.frame_callback, &frame_listener, &app);
+            }
             wl_surface_commit(app.surface);
         }
         app.redraw_pending = false;
