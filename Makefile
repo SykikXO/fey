@@ -1,33 +1,36 @@
 # Compiler and flags
 CXX = g++
-CXXFLAGS = -Wall -Wextra -pthread -I. $(shell pkg-config --cflags cairo)
-CFLAGS = -Wall -Wextra $(shell pkg-config --cflags cairo)
+CXXFLAGS = -Wall -Wextra -pthread -Isrc -Isrc/protocols $(shell pkg-config --cflags cairo)
+CFLAGS = -Wall -Wextra -Isrc/protocols $(shell pkg-config --cflags cairo)
 
 # Linker flags
 LDFLAGS = -lwayland-client -lrt -lm -lpthread $(shell pkg-config --libs cairo)
 
+# Project paths
+SRCDIR = src
+PROTODIR = $(SRCDIR)/protocols
+OBJDIR = build
+
 # Source files
-SRCS = main.cpp renderer.cpp loader.cpp input.cpp xdg-shell-protocol.c pointer-gestures-unstable-v1-protocol.c
+SRCS_CPP = $(SRCDIR)/main.cpp $(SRCDIR)/renderer.cpp $(SRCDIR)/loader.cpp $(SRCDIR)/input.cpp
+SRCS_C = $(PROTODIR)/xdg-shell-protocol.c $(PROTODIR)/pointer-gestures-unstable-v1-protocol.c
 
 # Object files
-OBJDIR = build
-OBJS = $(OBJDIR)/main.o $(OBJDIR)/renderer.o $(OBJDIR)/loader.o $(OBJDIR)/input.o $(OBJDIR)/xdg-shell-protocol.o $(OBJDIR)/pointer-gestures-unstable-v1-protocol.o
+OBJS = $(SRCS_CPP:$(SRCDIR)/%.cpp=$(OBJDIR)/%.o) \
+       $(SRCS_C:$(PROTODIR)/%.c=$(OBJDIR)/%.o)
 
 # Target
-TARGET = execthis
+TARGET = fey
 
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
 	$(CXX) $^ -o $@ $(LDFLAGS)
 
-$(OBJDIR)/%.o: %.cpp app.h renderer.h loader.h input.h | $(OBJDIR)
+$(OBJDIR)/%.o: $(SRCDIR)/%.cpp | $(OBJDIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(OBJDIR)/xdg-shell-protocol.o: xdg-shell-protocol.c | $(OBJDIR)
-	gcc $(CFLAGS) -c $< -o $@
-
-$(OBJDIR)/pointer-gestures-unstable-v1-protocol.o: pointer-gestures-unstable-v1-protocol.c | $(OBJDIR)
+$(OBJDIR)/%.o: $(PROTODIR)/%.c | $(OBJDIR)
 	gcc $(CFLAGS) -c $< -o $@
 
 $(OBJDIR):
@@ -36,4 +39,7 @@ $(OBJDIR):
 clean:
 	rm -rf $(OBJDIR) $(TARGET)
 
-.PHONY: all clean
+install: $(TARGET)
+	install -Dm755 $(TARGET) $(DESTDIR)/usr/bin/$(TARGET)
+
+.PHONY: all clean install

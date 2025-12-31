@@ -1,7 +1,7 @@
 #include "input.h"
 #include "renderer.h"
 #include "loader.h"
-#include "pointer-gestures-unstable-v1-client-protocol.h"
+#include "protocols/pointer-gestures-unstable-v1-client-protocol.h"
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
@@ -77,6 +77,14 @@ static void keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t seri
       }
     } else if (key == KEY_I) {
       app->show_info = !app->show_info;
+      redraw(app);
+    } else if (key == KEY_F) {
+      app->fullscreen = !app->fullscreen;
+      if (app->fullscreen) {
+        xdg_toplevel_set_fullscreen(app->xdg_toplevel, NULL);
+      } else {
+        xdg_toplevel_unset_fullscreen(app->xdg_toplevel);
+      }
       redraw(app);
     } else if (key == KEY_EQUAL || key == KEY_KPPLUS) {
       // Discrete Zoom Step In

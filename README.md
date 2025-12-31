@@ -1,24 +1,44 @@
-# cimv
-## crappyimv - a crappy copy of 'imv', a unix-wayland image viewer
+# fey
 
+`fey` is a high-performance, minimalistic image viewer for Wayland, written in C++. It focuses on speed, smooth animations, and efficiency.
 
-usage : 
-wayland-scanner client-header /usr/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml xdg-shell-client-protocol.h
-wayland-scanner private-code /usr/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml xdg-shell-protocol.c
+## ✨ Features
 
-use commands to generate xdg-shell-client-protocol.h and xdg-shell-protocol.c in current directory.
+- **🚀 Performance**: Direct-to-SHM rendering for zero-copy buffer updates.
+- **🌀 Smooth Animations**: Hardware-synchronized rubber-band physics for zoom and pan limits.
+- **🎞️ GIF Support**: Full animated GIF playback with adaptive frame-rate synchronization.
+- **🔋 Energy Efficient**: Adaptive refresh rate and intelligent event throttling to minimize CPU/Power usage.
+- **📸 Metadata**: Pre-cached EXIF photographic metadata display using `exiv2`.
+- **🤏 Gestures**: Native Wayland pinch-to-zoom and pan support.
 
-run using make command: in the main directory, run make clean for a clean build or make. this produces an executable called "execthis"
-or
-compile using :
-'
-mkdir -p build
+## 🛠️ Build & Install
 
-gcc -c main.c -o build/main.o
-gcc -c async.c -o build/async.o
-gcc -c xdg-shell-protocol.c -o build/xdg-shell-protocol.o
-gcc -c stb_image_impl.c -o build/stb_image_impl.o
+### Dependencies
+- `wayland`
+- `wayland-protocols`
+- `cairo`
+- `exiv2` (for metadata)
 
+### Compile
+```bash
+make
+```
 
-gcc build/main.o build/async.o build/xdg-shell-protocol.o build/stb_image_impl.o -o execthis -lwayland-client -lm -lpthread
-'
+### Install
+```bash
+sudo make install
+```
+
+## ⌨️ Hotkeys
+
+- `q`: Quit
+- `Left` / `Right`: Previous / Next image
+- `+` / `-`: Zoom in / out (discrete steps)
+- `Ctrl + Arrow Keys`: Pan image
+- `f`: Toggle fullscreen
+- `i`: Toggle info overlay
+- **Mouse Drag**: Pan image
+- **Pinch Gesture**: Zoom/Pan
+
+## 📄 License
+MIT

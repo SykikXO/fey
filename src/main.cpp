@@ -129,6 +129,7 @@ int main(int argc, char *argv[]) {
   app.shm_fd = -1;
   app.configured = false;
   app.last_interaction_time = std::chrono::steady_clock::now();
+  app.fullscreen = false;
 
   scan_directory(&app, argv[1]);
   if (app.images.empty()) die("No images found");

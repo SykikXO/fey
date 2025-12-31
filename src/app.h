@@ -7,8 +7,8 @@
 #include <vector>
 #include <map>
 #include <wayland-client.h>
-#include "xdg-shell-client-protocol.h"
-#include "pointer-gestures-unstable-v1-client-protocol.h"
+#include "protocols/xdg-shell-client-protocol.h"
+#include "protocols/pointer-gestures-unstable-v1-client-protocol.h"
 
 // Forward declarations for Wayland listener structs
 extern const struct wl_registry_listener registry_listener;
@@ -78,6 +78,7 @@ struct app_state {
   double last_mouse_x, last_mouse_y;
 
   std::chrono::steady_clock::time_point last_interaction_time;
+  bool fullscreen;
 };
 
 void die(const char *msg);
