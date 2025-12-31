@@ -171,6 +171,35 @@ void create_buffer(struct app_state *app) {
     }
   }
 
+  // Draw Floating UI Buttons (Tray)
+  int btn_w = 40, btn_h = 40, spacing = 20;
+  int tray_w = 3 * btn_w + 4 * spacing;
+  int tray_h = btn_h + 20;
+  double tray_x = (app->width - tray_w) / 2.0;
+  double tray_y = app->height - tray_h - 20;
+
+  // Only show tray if mouse is near bottom or we want it always visible
+  // For now, let's keep it visible when mouse is in the lower 15% of screen
+  if (app->mouse_y > app->height * 0.85) {
+      cairo_save(cr);
+      cairo_set_source_rgba(cr, 0.1, 0.1, 0.1, 0.7); // Dark translucent
+      cairo_new_sub_path(cr);
+      cairo_arc(cr, tray_x + 15, tray_y + 15, 15, M_PI, 1.5 * M_PI);
+      cairo_arc(cr, tray_x + tray_w - 15, tray_y + 15, 15, 1.5 * M_PI, 2 * M_PI);
+      cairo_arc(cr, tray_x + tray_w - 15, tray_y + tray_h - 15, 15, 0, 0.5 * M_PI);
+      cairo_arc(cr, tray_x + 15, tray_y + tray_h - 15, 15, 0.5 * M_PI, M_PI);
+      cairo_close_path(cr);
+      cairo_fill(cr);
+
+      // Draw Icons
+      double start_x = tray_x + spacing;
+      double start_y = tray_y + 10;
+      draw_icon(cr, start_x, start_y, 0); // Prev
+      draw_icon(cr, start_x + btn_w + spacing, start_y, 2); // Info
+      draw_icon(cr, start_x + 2 * (btn_w + spacing), start_y, 1); // Next
+      cairo_restore(cr);
+  }
+
   cairo_destroy(cr);
   cairo_surface_destroy(surface);
 }
