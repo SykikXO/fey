@@ -89,22 +89,6 @@ static void surface_frame_callback(void *data, struct wl_callback *callback, uin
       ui_animating = true;
   }
 
-  // GIF Animation Step
-  auto it_cache = app->cache.find(app->current_index);
-  if (it_cache != app->cache.end() && it_cache->second.frames.size() > 1) {
-      auto now = std::chrono::steady_clock::now();
-      auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - app->last_frame_time).count();
-      int delay = it_cache->second.delays[app->current_frame_index % it_cache->second.frames.size()];
-      if (delay <= 0) delay = 100;
-
-      if (elapsed >= delay) {
-          app->current_frame_index = (app->current_frame_index + 1) % it_cache->second.frames.size();
-          app->last_frame_time = now;
-          app->redraw_pending = true;
-      }
-      // Note: We don't set ui_animating here. GIF redraws will be triggered via poll() timeout.
-  }
-
   // Redraw if needed
   if (app->redraw_pending || app->zooming_in || app->zooming_out || ui_animating) {
     create_buffer(app);
@@ -164,7 +148,22 @@ int main(int argc, char *argv[]) {
   int display_fd = wl_display_get_fd(app.display);
 
   while (app.running) {
-    // Process continuous zooming state
+    // 1. GIF Animation Advancement (Independent of frame callback)
+    auto it_cache = app.cache.find(app.current_index);
+    if (it_cache != app.cache.end() && it_cache->second.frames.size() > 1) {
+      auto now = std::chrono::steady_clock::now();
+      auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - app.last_frame_time).count();
+      int delay = it_cache->second.delays[app.current_frame_index % it_cache->second.frames.size()];
+      if (delay <= 0) delay = 100;
+
+      if (elapsed >= delay) {
+        app.current_frame_index = (app.current_frame_index + 1) % it_cache->second.frames.size();
+        app.last_frame_time = now;
+        app.redraw_pending = true;
+      }
+    }
+
+    // 2. Continuous Zooming State
     if (app.zooming_in) {
       app.zoom = std::min(app.zoom * 1.03f, 15.0f);
       app.redraw_pending = true;
@@ -174,14 +173,13 @@ int main(int argc, char *argv[]) {
       app.redraw_pending = true;
     }
 
-    // Trigger redraw if ready
+    // 3. Trigger Redraw if Ready
     if (app.redraw_pending && !app.frame_callback && app.configured) {
-        // This handles cases like idle GIF playback or immediate user input
         create_buffer(&app);
         if (app.buffer) {
             wl_surface_attach(app.surface, app.buffer, 0, 0);
             wl_surface_damage(app.surface, 0, 0, app.width, app.height);
-            // If it's a UI animation start, we'll kick off the frame_callback loop here
+            // Request frame callback if we are in high-fidelity interaction
             if (app.zooming_in || app.zooming_out || std::abs(app.zoom - app.target_zoom) > 0.001f ||
                 std::abs(app.pan_x - app.target_pan_x) > 0.1f || std::abs(app.pan_y - app.target_pan_y) > 0.1f) {
                 app.frame_callback = wl_surface_frame(app.surface);
@@ -192,33 +190,31 @@ int main(int argc, char *argv[]) {
         app.redraw_pending = false;
     }
 
-    // Flush and prepare for read
+    // 4. Preparation for reading display events
     while (wl_display_prepare_read(app.display) != 0) {
       wl_display_dispatch_pending(app.display);
     }
     wl_display_flush(app.display);
 
-    // Poll for events
-    struct pollfd pfd = {};
-    pfd.fd = display_fd;
-    pfd.events = POLLIN;
-    // 4. Wait for events (with dynamic timeout for animations)
-    int timeout = -1; // Wait indefinitely if no animation
-    auto it_cache = app.cache.find(app.current_index); // Declare it_cache here
-
+    // 5. Dynamic Poll Timeout
+    struct pollfd pfd = { display_fd, POLLIN, 0 };
+    int timeout = -1; // Wait forever unless we have an animation
+    
+    // Check if we need a timeout for the next GIF frame
     if (it_cache != app.cache.end() && it_cache->second.frames.size() > 1) {
         auto now = std::chrono::steady_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - app.last_frame_time).count();
         int delay = it_cache->second.delays[app.current_frame_index % it_cache->second.frames.size()];
         if (delay <= 0) delay = 100;
-        
-        timeout = std::max(0, (int)(delay - elapsed));
+        timeout = std::max(0, (int)(delay - (int)elapsed));
     }
-    // If a redraw is already pending or we are animating zoom/pan, keep it snappy
-    if (app.redraw_pending || app.zooming_in || app.zooming_out) timeout = 0;
 
-    int ret = poll(&pfd, 1, timeout);
-    if (ret > 0) {
+    // If something is pending or we are doing intensive work, don't sleep
+    if (app.redraw_pending || app.zooming_in || app.zooming_out || app.frame_callback) {
+        timeout = 0;
+    }
+
+    if (poll(&pfd, 1, timeout) > 0) {
       wl_display_read_events(app.display);
     } else {
       wl_display_cancel_read(app.display);
