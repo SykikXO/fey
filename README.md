@@ -16,6 +16,13 @@ fey is a minimalistic, high-performance image viewer for Wayland, written in C++
 - **Metadata**: Pre-cached EXIF photographic metadata display using `exiv2`.
 - **Gestures**: Native Wayland pinch-to-zoom and pan support.
 
+## Install From AUR 
+
+- paru
+- `paru -S fey`
+- yay
+- `yay -S fey`
+
 ## Build & Install
 
 ### Dependencies
