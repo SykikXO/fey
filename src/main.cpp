@@ -118,7 +118,7 @@ static void surface_frame_callback(void *data, struct wl_callback *callback, uin
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 2) die("Usage: ./execthis <image.jpg>");
+  if (argc != 2) die("Usage: fey <image_file>");
 
   struct app_state app = {};
   app.running = 1;
