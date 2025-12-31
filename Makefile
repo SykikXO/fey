@@ -1,42 +1,39 @@
 # Compiler and flags
 CXX = g++
-CXXFLAGS = -Wall -Wextra -pthread -I.
+CXXFLAGS = -Wall -Wextra -pthread -I. $(shell pkg-config --cflags cairo)
+CFLAGS = -Wall -Wextra $(shell pkg-config --cflags cairo)
 
 # Linker flags
-LDFLAGS = -lwayland-client -lm -lpthread
+LDFLAGS = -lwayland-client -lrt -lm -lpthread $(shell pkg-config --libs cairo)
 
-# Update source files to exclude async.c, async.h, stb_image_impl.c
-SRCS = main.cpp xdg-shell-protocol.c
+# Source files
+SRCS = main.cpp renderer.cpp loader.cpp input.cpp xdg-shell-protocol.c pointer-gestures-unstable-v1-protocol.c
 
-# Object files in build directory
+# Object files
 OBJDIR = build
-OBJS = $(patsubst %.c,$(OBJDIR)/%.o,$(filter %.c,$(SRCS))) $(patsubst %.cpp,$(OBJDIR)/%.o,$(filter %.cpp,$(SRCS)))
+OBJS = $(OBJDIR)/main.o $(OBJDIR)/renderer.o $(OBJDIR)/loader.o $(OBJDIR)/input.o $(OBJDIR)/xdg-shell-protocol.o $(OBJDIR)/pointer-gestures-unstable-v1-protocol.o
 
-# Target executable
+# Target
 TARGET = execthis
 
-# Default target to build executable
 all: $(TARGET)
 
-# Link object files to produce executable
 $(TARGET): $(OBJS)
 	$(CXX) $^ -o $@ $(LDFLAGS)
 
-# Compile C++ source files to object files in build directory
-$(OBJDIR)/%.o: %.cpp | $(OBJDIR)
+$(OBJDIR)/%.o: %.cpp app.h renderer.h loader.h input.h | $(OBJDIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Compile C source files to object files in build directory
-$(OBJDIR)/%.o: %.c | $(OBJDIR)
+$(OBJDIR)/xdg-shell-protocol.o: xdg-shell-protocol.c | $(OBJDIR)
 	gcc $(CFLAGS) -c $< -o $@
 
-# Create build directory if it doesn't exist
+$(OBJDIR)/pointer-gestures-unstable-v1-protocol.o: pointer-gestures-unstable-v1-protocol.c | $(OBJDIR)
+	gcc $(CFLAGS) -c $< -o $@
+
 $(OBJDIR):
 	mkdir -p $(OBJDIR)
 
-# Clean build artifacts
 clean:
 	rm -rf $(OBJDIR) $(TARGET)
 
 .PHONY: all clean
-
