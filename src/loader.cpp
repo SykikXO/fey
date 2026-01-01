@@ -1,6 +1,5 @@
 #include "loader.h"
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb/stb_image.h"
+#include <Imlib2.h>
 #include "renderer.h"
 #include <dirent.h>
 #include <unistd.h>
@@ -22,7 +21,10 @@ void load_image(struct app_state *app, size_t index) {
   // Unload images outside window
   for (auto it = app->cache.begin(); it != app->cache.end(); ) {
       if ((int)it->first < start || (int)it->first > end) {
-          for (uint8_t *f : it->second.frames) stbi_image_free(f);
+          for (Imlib_Image f : it->second.frames) {
+              imlib_context_set_image(f);
+              imlib_free_image();
+          }
           it = app->cache.erase(it);
       } else {
           ++it;
@@ -33,60 +35,25 @@ void load_image(struct app_state *app, size_t index) {
   auto perform_load = [&](size_t idx) -> bool {
       if (app->cache.find(idx) != app->cache.end()) return true;
 
-      int w, h, n;
       std::string path = app->images[idx];
-      bool is_gif = (path.size() > 4 && path.substr(path.size() - 4) == ".gif");
+      Imlib_Image img = imlib_load_image(path.c_str());
+      if (!img) return false;
+
+      imlib_context_set_image(img);
+      int w = imlib_image_get_width();
+      int h = imlib_image_get_height();
 
       CachedImage ci = {};
+      ci.width = w;
+      ci.height = h;
+
+      // Store the Imlib_Image directly
+      ci.frames.push_back(img);
+      ci.delays.push_back(0);
       
-      if (is_gif) {
-          FILE *f = fopen(path.c_str(), "rb");
-          if (!f) return false;
-          fseek(f, 0, SEEK_END);
-          size_t size = ftell(f);
-          fseek(f, 0, SEEK_SET);
-          uint8_t *buffer = (uint8_t*)malloc(size);
-          fread(buffer, 1, size, f);
-          fclose(f);
+      // Do not free img here, we cache it
 
-          int *delays = nullptr;
-          int frames_count = 0;
-          uint8_t *data = stbi_load_gif_from_memory(buffer, (int)size, &delays, &w, &h, &frames_count, &n, 4);
-          free(buffer);
-
-          if (data) {
-              size_t frame_size = w * h * 4;
-              for (int i = 0; i < frames_count; ++i) {
-                  uint8_t *frame = (uint8_t*)malloc(frame_size);
-                  memcpy(frame, data + i * frame_size, frame_size);
-                  // Swizzle
-                  for (int j = 0; j < w * h; ++j) {
-                      uint8_t *p = &frame[j * 4];
-                      uint8_t r = p[0], b = p[2];
-                      p[0] = b; p[2] = r;
-                  }
-                  ci.frames.push_back(frame);
-                  ci.delays.push_back(delays[i]);
-              }
-              stbi_image_free(data);
-              free(delays);
-              ci.width = w; ci.height = h;
-              app->cache[idx] = ci;
-              return true;
-          }
-      } else {
-          uint8_t *data = stbi_load(path.c_str(), &w, &h, &n, 4);
-          if (data) {
-              for (int j = 0; j < w * h; ++j) {
-                  uint8_t *p = &data[j * 4];
-                  uint8_t r = p[0], b = p[2];
-                  p[0] = b; p[2] = r;
-              }
-              ci.frames.push_back(data);
-              ci.delays.push_back(0);
-              ci.width = w; ci.height = h;
-          }
-      }
+      // Extract EXIF metadata once during load
 
       // Extract EXIF metadata once during load
       if (!ci.frames.empty()) {
@@ -136,11 +103,7 @@ void load_image(struct app_state *app, size_t index) {
       return false;
   };
 
-  if (perform_load(index)) {
-      app->orig_data = app->cache[index].frames[0];
-      app->orig_width = app->cache[index].width;
-      app->orig_height = app->cache[index].height;
-  }
+  perform_load(index);
 
   // Proactively load neighbors
   for (int i = start; i <= end; ++i) {

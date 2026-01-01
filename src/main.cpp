@@ -30,6 +30,21 @@ static void registry_handle_global(void *data, struct wl_registry *registry, uin
     wl_seat_add_listener(app->seat, &seat_listener, app);
   } else if (strcmp(interface, zwp_pointer_gestures_v1_interface.name) == 0) {
     app->gestures = static_cast<struct zwp_pointer_gestures_v1*>(wl_registry_bind(registry, name, &zwp_pointer_gestures_v1_interface, 1));
+  } else if (strcmp(interface, wl_output_interface.name) == 0) {
+    struct wl_output *output = static_cast<struct wl_output*>(wl_registry_bind(registry, name, &wl_output_interface, 2));
+    static const struct wl_output_listener output_listener = {
+        .geometry = [](void*, struct wl_output*, int, int, int, int, int, const char*, const char*, int) {},
+        .mode = [](void*, struct wl_output*, uint32_t, int, int, int) {},
+        .done = [](void*, struct wl_output*) {},
+        .scale = [](void *data, struct wl_output*, int32_t factor) {
+            struct app_state *app = static_cast<struct app_state*>(data);
+            if (app->buffer_scale != factor) {
+                app->buffer_scale = factor;
+                app->redraw_pending = true;
+            }
+        },
+    };
+    wl_output_add_listener(output, &output_listener, app);
   }
 }
 
@@ -60,8 +75,14 @@ static void surface_frame_callback(void *data, struct wl_callback *callback, uin
 
   // 2. Dynamic Panning Limits
   // Calculate current image size on screen
-  float iw = app->orig_width * app->zoom;
-  float ih = app->orig_height * app->zoom;
+  int img_w = 0, img_h = 0;
+  if (app->cache.count(app->current_index)) {
+      img_w = app->cache[app->current_index].width;
+      img_h = app->cache[app->current_index].height;
+  }
+  
+  float iw = img_w * app->zoom;
+  float ih = img_h * app->zoom;
   
   // Hard limit: image should at least touch the screen center
   float limit_x = (app->width + iw) / 2.0f - 50; 
@@ -99,10 +120,14 @@ static void surface_frame_callback(void *data, struct wl_callback *callback, uin
       app->zoom = std::max(app->zoom / zoom_speed, 0.05f);
       ui_animating = true;
   }
+  
+  app->is_animating = ui_animating;
+  if (ui_animating) app->needs_hq_update = true;
 
   // Redraw if needed
   if (app->redraw_pending || ui_animating) {
     create_buffer(app);
+    wl_surface_set_buffer_scale(app->surface, app->buffer_scale);
     wl_surface_attach(app->surface, app->buffer, 0, 0);
     wl_surface_damage(app->surface, 0, 0, app->width, app->height);
 
@@ -135,9 +160,13 @@ int main(int argc, char *argv[]) {
   if (app.images.empty()) die("No images found");
   
   load_image(&app, app.current_index);
-  if (!app.orig_data) die("Failed to load initial image");
-  app.width = app.orig_width;
-  app.height = app.orig_height;
+  if (app.cache.count(app.current_index)) {
+      app.width = app.cache[app.current_index].width;
+      app.height = app.cache[app.current_index].height;
+  } else {
+      app.width = 800; app.height = 600; // Fallback
+  }
+  app.buffer_scale = 1; // Default to 1, can be improved with output listeners
 
   app.display = wl_display_connect(NULL);
   if (!app.display) die("Cannot connect to Wayland display");
@@ -180,6 +209,7 @@ int main(int argc, char *argv[]) {
     if (app.redraw_pending && !app.frame_callback && app.configured) {
         create_buffer(&app);
         if (app.buffer) {
+            wl_surface_set_buffer_scale(app.surface, app.buffer_scale);
             wl_surface_attach(app.surface, app.buffer, 0, 0);
             wl_surface_damage(app.surface, 0, 0, app.width, app.height);
             // If animation starts, frame callback will be set up in callback or here
@@ -218,9 +248,26 @@ int main(int argc, char *argv[]) {
         timeout = 0;
     }
 
-    // IF CONTINUOUSLY ZOOMING: Ensure we keep checking the time to trigger the next frame
-    // via the redraw_pending logic in the next loop iteration. 
-    // Usually, this will be handled by the frame_callback presentation.
+    // IF NEEDS HQ UPDATE: We need to ensure we wake up to draw the high quality frame
+    // This handles the transition from Fast -> Best filter
+    if (app.needs_hq_update && timeout == -1) {
+        bool conditions_active = (app.zooming_in || app.zooming_out || app.is_panning || app.is_animating);
+        
+        if (!conditions_active) {
+            auto now = std::chrono::steady_clock::now();
+            auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - app.last_interaction_time).count();
+            
+            if (elapsed_ms >= 100) {
+                 // Conditions met! Trigger redraw to apply High Quality
+                 app.redraw_pending = true;
+                 app.needs_hq_update = false;
+                 timeout = 0;
+            } else {
+                 // Need to wait for debounce
+                 timeout = 105 - (int)elapsed_ms; 
+            }
+        }
+    }
     
     if (poll(&pfd, 1, timeout) > 0) {
       wl_display_read_events(app.display);

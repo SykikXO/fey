@@ -1,10 +1,10 @@
 # Compiler and flags
 CXX = g++
-CXXFLAGS = -Wall -Wextra -pthread -Isrc -Isrc/protocols $(shell pkg-config --cflags cairo)
-CFLAGS = -Wall -Wextra -Isrc/protocols $(shell pkg-config --cflags cairo)
+CXXFLAGS = -Wall -Wextra -pthread -Isrc -Isrc/protocols $(shell pkg-config --cflags cairo imlib2)
+CFLAGS = -Wall -Wextra -Isrc/protocols $(shell pkg-config --cflags cairo imlib2)
 
 # Linker flags
-LDFLAGS = -lwayland-client -lrt -lm -lpthread $(shell pkg-config --libs cairo)
+LDFLAGS = -lwayland-client -lrt -lm -lpthread $(shell pkg-config --libs cairo imlib2)
 
 # Project paths
 SRCDIR = src

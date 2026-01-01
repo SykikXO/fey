@@ -14,6 +14,7 @@ static void pinch_begin(void *data, struct zwp_pointer_gesture_pinch_v1 *pinch, 
 
 static void redraw(struct app_state *app) {
   app->redraw_pending = true;
+  app->needs_hq_update = true;
   app->last_interaction_time = std::chrono::steady_clock::now();
 }
 
@@ -46,7 +47,15 @@ static void keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t seri
   struct app_state *app = static_cast<struct app_state*>(data);
   bool pressed = (state == WL_KEYBOARD_KEY_STATE_PRESSED);
 
-  if (pressed) {
+  if (key == KEY_EQUAL || key == KEY_KPPLUS) {
+    if (app->modifiers & (1 << 2)) app->zoom = std::min(app->zoom + 0.02f, 15.0f); // Fine zoom
+    else app->zooming_in = pressed;
+    if (pressed) redraw(app);
+  } else if (key == KEY_MINUS || key == KEY_KPMINUS) {
+    if (app->modifiers & (1 << 2)) app->zoom = std::max(app->zoom - 0.02f, 0.05f); // Fine zoom
+    else app->zooming_out = pressed;
+    if (pressed) redraw(app);
+  } else if (pressed) {
     if (key == KEY_Q) {
       app->running = 0;
     } else if (key == KEY_RIGHT) {
@@ -85,14 +94,6 @@ static void keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t seri
       } else {
         xdg_toplevel_unset_fullscreen(app->xdg_toplevel);
       }
-      redraw(app);
-    } else if (key == KEY_EQUAL || key == KEY_KPPLUS) {
-      // Discrete Zoom Step In
-      app->zoom = std::min(app->zoom + 0.1f, 10.0f);
-      redraw(app);
-    } else if (key == KEY_MINUS || key == KEY_KPMINUS) {
-      // Discrete Zoom Step Out
-      app->zoom = std::max(app->zoom - 0.1f, 0.05f);
       redraw(app);
     }
   }
